@@ -372,7 +372,7 @@ const App: React.FC = () => {
                       <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">2</div>
                       <div>
                          <p className="text-xs font-bold text-gray-800">Abra seu App do Banco</p>
-                         <p className="text-[10px] text-gray-500 mt-1">Vá em Pix > Pagar e cole a chave copiada.</p>
+                         <p className="text-[10px] text-gray-500 mt-1">Vá em Pix &gt; Pagar e cole a chave copiada.</p>
                       </div>
                    </div>
 
