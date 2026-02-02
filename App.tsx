@@ -19,12 +19,7 @@ import {
   Download,
   Share2,
   X,
-  FileText,
-  ShieldCheck,
-  QrCode,
   Copy,
-  Info,
-  ChevronRight,
   Check,
   Loader2
 } from 'lucide-react';
@@ -43,7 +38,6 @@ const App: React.FC = () => {
 
   const fetchRegistrations = useCallback(async () => {
     setIsLoadingData(true);
-    setError(null);
     try {
       const { data, error: sbError } = await supabase
         .from('registrations')
@@ -52,21 +46,19 @@ const App: React.FC = () => {
 
       if (sbError) throw sbError;
       
-      // Mapear de volta de snake_case para camelCase se necessário
       const mappedData = (data || []).map((reg: any) => ({
         id: reg.id,
-        enrollmentNumber: reg.enrollment_number || reg.enrollmentNumber,
+        enrollmentNumber: reg.enrollment_number,
         name: reg.name,
         phone: reg.phone,
         timestamp: reg.timestamp,
-        transactionId: reg.transaction_id || reg.transactionId,
-        paymentStatus: reg.payment_status || reg.paymentStatus
+        transactionId: reg.transaction_id,
+        paymentStatus: reg.payment_status
       }));
       
       setRegistrations(mappedData);
     } catch (err: any) {
-      console.error('Erro ao buscar dados:', err);
-      // Não bloqueia o app se falhar a busca inicial, apenas loga
+      console.error('Erro ao carregar lista:', err);
     } finally {
       setIsLoadingData(false);
     }
@@ -74,19 +66,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchRegistrations();
-
     const channel = supabase
       .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'registrations' },
-        () => fetchRegistrations()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => fetchRegistrations())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [fetchRegistrations]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,7 +84,6 @@ const App: React.FC = () => {
       const nextNum = (registrations.length + 1).toString().padStart(3, '0');
       const transactionId = `FT-${Math.random().toString(36).toUpperCase().substring(2, 10)}`;
       
-      // Payload usando snake_case que é o padrão do Supabase/Postgres
       const payload = {
         enrollment_number: nextNum,
         name: formData.name,
@@ -115,10 +98,7 @@ const App: React.FC = () => {
         .insert([payload])
         .select();
 
-      if (insertError) {
-        console.error('Erro detalhado do Supabase:', insertError);
-        throw new Error(insertError.message);
-      }
+      if (insertError) throw new Error(insertError.message);
 
       const savedData = data?.[0];
       const savedReg: Registration = {
@@ -137,7 +117,7 @@ const App: React.FC = () => {
       await fetchRegistrations();
     } catch (err: any) {
       console.error('Falha na inscrição:', err);
-      setError(`Erro: ${err.message || 'Verifique sua conexão e tente novamente.'}`);
+      setError(err.message || 'Erro inesperado ao salvar no banco de dados.');
     } finally {
       setIsSubmitting(false);
     }
@@ -172,14 +152,9 @@ const App: React.FC = () => {
     r.enrollmentNumber.includes(searchTerm)
   );
 
-  const getQrData = (reg: Registration) => {
-    return `Evento: Fé e Terapia\nParticipante: ${reg.name}\nInscrição: #${reg.enrollmentNumber}\nID: ${reg.transactionId}`;
-  };
-
   return (
-    <div className="min-h-screen bg-pattern pb-20 selection:bg-rose-100 selection:text-rose-900">
+    <div className="min-h-screen bg-pattern pb-20">
       <header className="relative bg-white border-b border-pink-100 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-50 rounded-full blur-[100px] -mr-48 -mt-48 opacity-60"></div>
         <div className="max-w-5xl mx-auto px-6 py-20 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-50 text-rose-600 text-sm font-semibold mb-8 border border-rose-100 shadow-sm animate-pulse">
             <Sparkles size={16} />
@@ -203,10 +178,10 @@ const App: React.FC = () => {
             </h2>
             <div className="space-y-8">
               <DetailItem icon={<Users size={20} />} label="Público" value={EVENT_DATA.audienceRules} color="text-pink-600" />
-              <DetailItem icon={<Clock size={20} />} label="Data e Horário" value={EVENT_DATA.time} color="text-amber-600" />
-              <DetailItem icon={<Wallet size={20} />} label="Valor da Inscrição" value={EVENT_DATA.price} color="text-emerald-600" />
-              <DetailItem icon={<MapPin size={20} />} label="Localização" value={EVENT_DATA.address} color="text-blue-600" />
-              <DetailItem icon={<Phone size={20} />} label="WhatsApp Suporte" value={EVENT_DATA.phone} color="text-indigo-600" />
+              <DetailItem icon={<Clock size={20} />} label="Horário" value={EVENT_DATA.time} color="text-amber-600" />
+              <DetailItem icon={<Wallet size={20} />} label="Valor" value={EVENT_DATA.price} color="text-emerald-600" />
+              <DetailItem icon={<MapPin size={20} />} label="Local" value={EVENT_DATA.address} color="text-blue-600" />
+              <DetailItem icon={<Phone size={20} />} label="Suporte" value={EVENT_DATA.phone} color="text-indigo-600" />
             </div>
           </div>
         </div>
@@ -219,12 +194,14 @@ const App: React.FC = () => {
             </h2>
 
             {error && (
-              <div className="mb-8 p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl flex items-start gap-3">
-                <AlertCircle className="text-rose-500 mt-1 flex-shrink-0" size={20} />
+              <div className="mb-8 p-6 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl flex items-start gap-3">
+                <AlertCircle className="text-rose-500 mt-1 flex-shrink-0" size={24} />
                 <div className="text-sm">
-                  <p className="font-bold">Não foi possível completar a inscrição</p>
-                  <p className="opacity-80">{error}</p>
-                  <p className="mt-2 text-[10px] font-mono bg-white/50 p-2 rounded">Dica: Verifique se as tabelas foram criadas no Supabase e se a chave API é válida.</p>
+                  <p className="font-black uppercase tracking-widest text-[10px] mb-1">Erro Detectado</p>
+                  <p className="font-bold mb-2">{error}</p>
+                  <p className="opacity-70 leading-relaxed">
+                    A conexão com o Supabase falhou. Certifique-se de que você rodou o comando SQL no editor do Supabase para criar a tabela "registrations".
+                  </p>
                 </div>
               </div>
             )}
@@ -312,7 +289,7 @@ const App: React.FC = () => {
       {lastRegistration && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-gray-900/60 backdrop-blur-md">
           <div className="bg-white rounded-[3rem] shadow-2xl max-w-md w-full overflow-hidden relative p-8">
-            <button onClick={() => setLastRegistration(null)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-rose-500"><X size={24} /></button>
+            <button onClick={() => setLastRegistration(null)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-rose-500 transition-colors"><X size={24} /></button>
             
             {paymentStep === 'info' ? (
               <div className="text-center">
@@ -320,39 +297,39 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-black text-gray-900 mb-6">Pague via Pix</h2>
                 
                 <div className="bg-white border border-rose-100 rounded-xl p-4 mb-6 flex items-center justify-between group">
-                  <code className="text-sm font-black text-rose-600">{EVENT_DATA.pixKey}</code>
-                  <button onClick={copyPixKey} className="text-rose-400 hover:text-rose-600">
+                  <code className="text-sm font-black text-rose-600 tracking-widest">{EVENT_DATA.pixKey}</code>
+                  <button onClick={copyPixKey} className="text-rose-400 hover:text-rose-600 transition-colors">
                     {copied ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
                   </button>
                 </div>
 
                 <div className="bg-rose-50/50 rounded-3xl p-6 border border-rose-100 mb-8 flex flex-col items-center gap-3">
                   <Loader2 className="text-rose-500 animate-spin" size={24} />
-                  <p className="text-xs font-black text-rose-600 uppercase">Aguardando Pagamento</p>
+                  <p className="text-xs font-black text-rose-600 uppercase tracking-widest">Aguardando Pagamento</p>
                 </div>
 
-                <button onClick={simulatePaymentVerification} className="w-full text-[10px] text-gray-300 hover:text-rose-400 uppercase font-black tracking-widest mt-2 py-2">
-                  (Simular Confirmação para teste)
+                <button onClick={simulatePaymentVerification} className="w-full text-[10px] text-gray-300 hover:text-rose-500 uppercase font-black tracking-widest mt-2 py-2 transition-colors">
+                  (Simular Confirmação Bancária)
                 </button>
               </div>
             ) : (
               <div className="text-center">
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 size={32} /></div>
                 <h3 className="text-2xl font-black text-gray-900">Inscrição Confirmada!</h3>
-                <p className="text-gray-500 text-sm mt-2 mb-8">Sua vaga está garantida. Nos vemos em breve!</p>
+                <p className="text-gray-500 text-sm mt-2 mb-8">Sua vaga está garantida para o evento Fé & Terapia. Nos vemos em breve!</p>
                 
                 <div className="bg-rose-50/30 rounded-2xl p-6 text-left space-y-4 mb-8">
                   <div className="flex justify-between border-b border-rose-100 pb-2">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Participante</span>
-                    <span className="font-bold text-gray-700">{lastRegistration.name}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Participante</span>
+                    <span className="font-bold text-gray-800">{lastRegistration.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Nº Inscrição</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nº Inscrição</span>
                     <span className="font-black text-rose-600">#{lastRegistration.enrollmentNumber}</span>
                   </div>
                 </div>
 
-                <button onClick={() => window.print()} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2">
+                <button onClick={() => window.print()} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all">
                   <Download size={18} /> Baixar Comprovante
                 </button>
               </div>
@@ -368,7 +345,7 @@ const App: React.FC = () => {
 
 const DetailItem: React.FC<{ icon: React.ReactNode, label: string, value: string, color: string }> = ({ icon, label, value, color }) => (
   <div className="flex gap-5 group">
-    <div className={`mt-1 flex-shrink-0 ${color} p-3 rounded-2xl bg-white shadow-sm`}>{icon}</div>
+    <div className={`mt-1 flex-shrink-0 ${color} p-3 rounded-2xl bg-white shadow-sm transition-all group-hover:scale-110`}>{icon}</div>
     <div>
       <p className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1">{label}</p>
       <p className="text-gray-800 text-sm font-semibold">{value}</p>
