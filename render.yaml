@@ -1,0 +1,10 @@
+
+services:
+  - type: static
+    name: fe-e-terapia
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: API_KEY
+        sync: false
